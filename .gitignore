@@ -1,0 +1,97 @@
+# Build directories
+build/
+build_*/
+Release/
+Debug/
+x64/
+x86/
+
+# Visual Studio files
+*.vcxproj.user
+*.vcxproj.filters
+*.sln.docstates
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# TensorRT engines (large binary files)
+*.engine
+*.plan
+
+# Model files (large)
+*.gguf
+*.bin
+*.safetensors
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Local environment
+.env
+.env.local
