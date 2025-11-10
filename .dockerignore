@@ -1,0 +1,48 @@
+# Build artifacts
+build/
+*.o
+*.so
+*.a
+complete_inference
+engine_diagnostic
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Models and data (mount as volumes instead)
+models/
+tokenizer/
+logs/
+*.engine
+*.onnx
+*.bin
+*.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Misc
+.DS_Store
+Thumbs.db

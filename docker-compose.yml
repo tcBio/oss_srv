@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  oss_srv:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: oss_srv:latest
+    container_name: oss20b_server
+
+    # GPU support (requires nvidia-docker)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # Environment variables
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - TENSORRT_ROOT=/opt/tensorrt
+      - LOG_LEVEL=INFO
+
+    # Mount volumes
+    volumes:
+      # Mount TensorRT (adjust path to your TensorRT installation)
+      - ${TENSORRT_PATH:-/opt/tensorrt}:/opt/tensorrt:ro
+
+      # Mount model directory (put your .engine files here)
+      - ./models:/app/models:ro
+
+      # Mount tokenizer files
+      - ./tokenizer:/app/tokenizer:ro
+
+      # Mount logs
+      - ./logs:/app/logs
+
+    # Expose ports
+    ports:
+      - "8000:8000"   # HTTP API (future)
+      - "50051:50051" # gRPC API (future)
+
+    # Resource limits
+    # Adjust based on your GPU and system
+    mem_limit: 64g
+    memswap_limit: 64g
+    shm_size: 8g
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Command to run
+    # Override this to run your specific inference command
+    # Example: docker-compose run oss_srv /app/complete_inference /app/models/model.engine "Once upon a time" 100 0.7 0.9
+    command: /bin/bash -c "echo 'OSS_SRV Ready. Run: ./complete_inference models/model.engine \"prompt\" 100 0.7 0.9' && /bin/bash"
+
+    # Interactive terminal
+    stdin_open: true
+    tty: true
+
+    # Network
+    networks:
+      - oss_srv_network
+
+networks:
+  oss_srv_network:
+    driver: bridge
+
+# Example usage:
+#
+# 1. Setup:
+#    export TENSORRT_PATH=/path/to/tensorrt
+#    mkdir -p models tokenizer logs
+#    # Copy your model.engine to models/
+#    # Copy tokenizer files to tokenizer/
+#
+# 2. Build:
+#    docker-compose build
+#
+# 3. Run:
+#    docker-compose up
+#
+# 4. Execute inference:
+#    docker-compose exec oss_srv /app/complete_inference /app/models/model.engine "Once upon a time" 100 0.7 0.9
+#
+# 5. Interactive mode:
+#    docker-compose run oss_srv /bin/bash
+#    # Inside container: ./complete_inference models/model.engine "prompt" 100 0.7 0.9

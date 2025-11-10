@@ -142,36 +142,151 @@ void DynamicBatcher::batchingLoop() {
 }
 
 void DynamicBatcher::processBatch() {
-    // Simple implementation - process one request at a time
-    if (pending_requests_.empty()) return;
-    
-    auto request = pending_requests_.front();
-    pending_requests_.pop();
-    
-    // Execute inference
-    auto result = engine_->executeInference(request->request);
-    
-    // Complete the request
-    request->promise.set_value(result);
-    total_requests_processed_++;
-    if (!result.generated_tokens.empty()) {
-        total_tokens_generated_ += result.generated_tokens.size();
+    // Form a batch from pending requests
+    auto batch = formBatch();
+    if (batch.empty()) return;
+
+    std::cout << "Processing batch of " << batch.size() << " requests" << std::endl;
+
+    // Process each request in the batch (simplified - in production, batch them together)
+    for (auto& batching_req : batch) {
+        try {
+            // Execute inference for this request
+            auto result = engine_->executeInference(batching_req->request);
+
+            // Update statistics
+            batching_req->current_token_count += result.generated_tokens.size();
+            batching_req->generated_tokens.insert(
+                batching_req->generated_tokens.end(),
+                result.generated_tokens.begin(),
+                result.generated_tokens.end()
+            );
+
+            // Check if request is complete
+            if (result.generated_tokens.empty() ||
+                batching_req->current_token_count >= batching_req->request.max_tokens) {
+                completeRequest(batching_req, result);
+                batching_req->is_completed = true;
+
+                total_requests_processed_++;
+                total_tokens_generated_ += batching_req->current_token_count;
+            } else {
+                // Re-queue for next iteration (continuous batching)
+                active_requests_.push_back(batching_req);
+            }
+        } catch (const std::exception& e) {
+            InferenceResult error_result;
+            error_result.success = false;
+            error_result.error_message = std::string("Inference error: ") + e.what();
+            batching_req->promise.set_value(error_result);
+        }
     }
 }
 
 std::vector<std::shared_ptr<BatchingRequest>> DynamicBatcher::formBatch() {
     std::vector<std::shared_ptr<BatchingRequest>> batch;
-    return batch; // Stub implementation
+    auto now = std::chrono::steady_clock::now();
+
+    // First, check active requests for preemption
+    auto it = active_requests_.begin();
+    while (it != active_requests_.end()) {
+        if (shouldPreempt(*it)) {
+            // Preempt this request - complete it early
+            InferenceResult preempt_result;
+            preempt_result.success = true;
+            preempt_result.generated_text = "Preempted";
+            preempt_result.generated_tokens = (*it)->generated_tokens;
+            completeRequest(*it, preempt_result);
+            it = active_requests_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Add pending requests to batch up to max_batch_size
+    while (!pending_requests_.empty() && batch.size() < config_.max_batch_size) {
+        auto req = pending_requests_.front();
+        pending_requests_.pop();
+
+        // Check if request has been waiting too long
+        auto wait_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - req->arrival_time).count();
+
+        batch.push_back(req);
+
+        // If we have min_batch_size and no timeout, process immediately
+        if (batch.size() >= config_.min_batch_size && wait_time < config_.batch_timeout_ms) {
+            break;
+        }
+    }
+
+    // Add active requests (continuous batching) if there's room
+    size_t remaining_capacity = config_.max_batch_size - batch.size();
+    size_t num_to_add = std::min(remaining_capacity, active_requests_.size());
+
+    for (size_t i = 0; i < num_to_add; ++i) {
+        batch.push_back(active_requests_[i]);
+    }
+
+    // Remove added active requests
+    if (num_to_add > 0) {
+        active_requests_.erase(active_requests_.begin(), active_requests_.begin() + num_to_add);
+    }
+
+    return batch;
 }
 
 void DynamicBatcher::updateActiveRequests(const std::vector<InferenceResult>& results) {
-    // Stub implementation
+    // Update active requests with new generation results
+    for (size_t i = 0; i < std::min(results.size(), active_requests_.size()); ++i) {
+        auto& req = active_requests_[i];
+        const auto& result = results[i];
+
+        req->generated_tokens.insert(
+            req->generated_tokens.end(),
+            result.generated_tokens.begin(),
+            result.generated_tokens.end()
+        );
+
+        req->current_token_count += result.generated_tokens.size();
+
+        // Check if done
+        if (req->current_token_count >= req->request.max_tokens) {
+            req->is_completed = true;
+        }
+    }
+
+    // Remove completed requests
+    auto it = active_requests_.begin();
+    while (it != active_requests_.end()) {
+        if ((*it)->is_completed) {
+            InferenceResult final_result;
+            final_result.success = true;
+            final_result.generated_tokens = (*it)->generated_tokens;
+            completeRequest(*it, final_result);
+            it = active_requests_.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 bool DynamicBatcher::shouldPreempt(const std::shared_ptr<BatchingRequest>& req) const {
-    return false; // Stub implementation
+    if (!config_.enable_preemption) return false;
+
+    auto now = std::chrono::steady_clock::now();
+    auto processing_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - req->arrival_time).count();
+
+    // Preempt if:
+    // 1. Request has been processing for too long (> 10x target latency)
+    // 2. Has generated a reasonable number of tokens already
+    float max_processing_time = config_.target_latency_ms * 10.0f;
+
+    return processing_time > max_processing_time && req->current_token_count > 10;
 }
 
 void DynamicBatcher::completeRequest(std::shared_ptr<BatchingRequest> req, const InferenceResult& result) {
     req->promise.set_value(result);
+    req->is_completed = true;
 }

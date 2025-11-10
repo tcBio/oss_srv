@@ -110,6 +110,7 @@ add_executable(complete_inference
     src/cpp/dynamic_batcher.cpp
     src/cpp/cuda_graphs.cpp
     src/cpp/kv_cache.cpp
+    src/cpp/kv_cache_kernels.cu
 )
 
 # Create engine diagnostic tool
