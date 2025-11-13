@@ -1,0 +1,127 @@
+# Prometheus Alert Rules for Diffusion Monitoring
+
+groups:
+  - name: diffusion_quality_alerts
+    interval: 30s
+    rules:
+      # High perplexity indicates poor quality
+      - alert: HighPerplexity
+        expr: diffusion_final_perplexity > 50
+        for: 1m
+        labels:
+          severity: warning
+          component: quality
+        annotations:
+          summary: "High perplexity detected for {{ $labels.model }}"
+          description: "Model {{ $labels.model }} has perplexity {{ $value }}, indicating poor output quality"
+
+      # Low confidence indicates uncertainty
+      - alert: LowConfidence
+        expr: diffusion_final_confidence < 0.5
+        for: 1m
+        labels:
+          severity: warning
+          component: quality
+        annotations:
+          summary: "Low confidence detected for {{ $labels.model }}"
+          description: "Model {{ $labels.model }} has confidence {{ $value }}, indicating uncertain predictions"
+
+  - name: diffusion_convergence_alerts
+    interval: 30s
+    rules:
+      # Model not converging efficiently
+      - alert: SlowConvergence
+        expr: diffusion_convergence_efficiency < 0.3
+        for: 2m
+        labels:
+          severity: warning
+          component: convergence
+        annotations:
+          summary: "Slow convergence for {{ $labels.model }}"
+          description: "Model {{ $labels.model }} has convergence efficiency {{ $value }}, taking too many steps"
+
+      # Too many steps without convergence
+      - alert: ConvergenceFailure
+        expr: diffusion_inference_steps > 150
+        for: 1m
+        labels:
+          severity: critical
+          component: convergence
+        annotations:
+          summary: "Convergence failure for {{ $labels.model }}"
+          description: "Model {{ $labels.model }} took {{ $value }} steps without converging"
+
+  - name: diffusion_performance_alerts
+    interval: 15s
+    rules:
+      # High latency per step
+      - alert: HighStepLatency
+        expr: histogram_quantile(0.95, rate(diffusion_step_latency_seconds_bucket[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High step latency for {{ $labels.model }}"
+          description: "95th percentile step latency is {{ $value }}s for model {{ $labels.model }}"
+
+      # Inference taking too long
+      - alert: HighInferenceLatency
+        expr: histogram_quantile(0.95, rate(diffusion_inference_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "High inference latency for {{ $labels.model }}"
+          description: "95th percentile inference latency is {{ $value }}s for model {{ $labels.model }}"
+
+  - name: diffusion_anomaly_alerts
+    interval: 30s
+    rules:
+      # Anomalies detected
+      - alert: AnomaliesDetected
+        expr: rate(diffusion_anomalies_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: quality
+        annotations:
+          summary: "Anomalies detected for {{ $labels.model }}"
+          description: "{{ $labels.type }} anomalies detected at rate {{ $value }}/s for model {{ $labels.model }}"
+
+      # Critical anomalies
+      - alert: CriticalAnomalies
+        expr: rate(diffusion_anomalies_total{severity="error"}[5m]) > 0.01
+        for: 1m
+        labels:
+          severity: critical
+          component: quality
+        annotations:
+          summary: "Critical anomalies for {{ $labels.model }}"
+          description: "{{ $labels.type }} critical anomalies at rate {{ $value }}/s for model {{ $labels.model }}"
+
+  - name: diffusion_system_alerts
+    interval: 30s
+    rules:
+      # Inference failure rate
+      - alert: HighFailureRate
+        expr: rate(diffusion_inference_total{status="failure"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "High failure rate for {{ $labels.model }}"
+          description: "Inference failure rate is {{ $value }}/s for model {{ $labels.model }}"
+
+      # No recent inferences (service might be down)
+      - alert: NoRecentInferences
+        expr: rate(diffusion_inference_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "No recent inferences for {{ $labels.model }}"
+          description: "No inferences detected in the last 5 minutes for model {{ $labels.model }}"

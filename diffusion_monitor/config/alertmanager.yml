@@ -1,0 +1,82 @@
+# AlertManager Configuration
+
+global:
+  resolve_timeout: 5m
+
+# Route configuration
+route:
+  group_by: ['alertname', 'model']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+
+  routes:
+    # Critical alerts go to pagerduty (if configured)
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      continue: true
+
+    # Quality alerts to slack
+    - match:
+        component: quality
+      receiver: 'quality-alerts'
+
+    # Performance alerts to email
+    - match:
+        component: performance
+      receiver: 'performance-alerts'
+
+# Receiver configurations
+receivers:
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://host.docker.internal:9099/webhook'  # Generic webhook
+        send_resolved: true
+
+  - name: 'critical-alerts'
+    # PagerDuty (configure your integration key)
+    # pagerduty_configs:
+    #   - service_key: YOUR_PAGERDUTY_KEY
+    #     description: "{{ .CommonAnnotations.summary }}"
+
+    # Slack (configure your webhook URL)
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+    #     channel: '#critical-alerts'
+    #     title: "Critical Alert: {{ .CommonAnnotations.summary }}"
+    #     text: "{{ .CommonAnnotations.description }}"
+
+    webhook_configs:
+      - url: 'http://host.docker.internal:9099/critical'
+        send_resolved: true
+
+  - name: 'quality-alerts'
+    # Slack for quality issues
+    webhook_configs:
+      - url: 'http://host.docker.internal:9099/quality'
+        send_resolved: true
+
+  - name: 'performance-alerts'
+    # Email for performance issues
+    # email_configs:
+    #   - to: 'sre-team@example.com'
+    #     from: 'alertmanager@example.com'
+    #     smarthost: 'smtp.example.com:587'
+    #     auth_username: 'alertmanager@example.com'
+    #     auth_password: 'password'
+
+    webhook_configs:
+      - url: 'http://host.docker.internal:9099/performance'
+        send_resolved: true
+
+# Inhibit rules (prevent alert spam)
+inhibit_rules:
+  # Don't alert on performance if system is down
+  - source_match:
+      severity: 'critical'
+      component: 'system'
+    target_match:
+      component: 'performance'
+    equal: ['model']

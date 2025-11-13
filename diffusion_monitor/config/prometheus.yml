@@ -1,0 +1,44 @@
+# Prometheus Configuration for Diffusion Monitoring
+
+global:
+  scrape_interval: 15s      # Scrape targets every 15 seconds
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+  external_labels:
+    monitor: 'diffusion-monitor'
+    environment: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Scrape the diffusion monitor exporter
+  - job_name: 'diffusion-monitor'
+    static_configs:
+      - targets: ['host.docker.internal:8000']  # Adjust if running on different host
+        labels:
+          instance: 'local-dev'
+          model: 'llada'
+
+  # Scrape Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Scrape Node Exporter (if you want system metrics)
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+
+  # Scrape GPU metrics (if using dcgm-exporter)
+  # - job_name: 'gpu'
+  #   static_configs:
+  #     - targets: ['dcgm-exporter:9400']
