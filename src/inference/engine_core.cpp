@@ -239,22 +239,29 @@ InferenceResult EngineCore::executeInference(const InferenceRequest& request) {
         std::vector<int32_t> current_tokens = input_tokens;
         std::vector<int32_t> generated_tokens;
         
-        // Generation loop
+        // Generation loop with streaming support
         for (int i = 0; i < request.max_tokens; i++) {
             std::vector<float> logits;
             bool inference_success = tensorrt_engine_->executeInference(current_tokens, logits);
-            
+
             if (!inference_success || logits.empty()) {
                 result.error_message = "TensorRT inference failed";
                 return result;
             }
-            
+
             // Sample next token using CPU sampling (TensorRT-only)
             int32_t next_token = sampleTokenCPU(logits, request.temperature, request.top_p);
-            
+
             generated_tokens.push_back(next_token);
             current_tokens.push_back(next_token);
-            
+
+            // Streaming callback: send token as it's generated
+            if (request.stream && request.stream_callback) {
+                std::string token_text = tokenizer_->detokenize({next_token});
+                bool is_final = (next_token == tokenizer_->getEOSTokenId()) || (i == request.max_tokens - 1);
+                request.stream_callback(next_token, token_text, is_final);
+            }
+
             // Check for EOS token
             if (next_token == tokenizer_->getEOSTokenId()) {
                 break;

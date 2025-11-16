@@ -113,12 +113,56 @@ add_executable(complete_inference
     src/cpp/kv_cache_kernels.cu
 )
 
+# Create streaming inference example
+add_executable(streaming_inference_example
+    src/inference/streaming_inference_example.cpp
+    src/inference/engine_core.cpp
+    src/inference/tensorrt_engine.cpp
+    src/cpp/tokenizer.cpp
+    src/cpp/memory_manager.cpp
+    src/cpp/memory_pool.cpp
+    src/cpp/cuda_graphs.cpp
+    src/cpp/kv_cache.cpp
+    src/cpp/kv_cache_kernels.cu
+)
+
+# Create speculative decoding example
+add_executable(speculative_decoding_example
+    src/inference/speculative_decoding.cpp
+    src/inference/engine_core.cpp
+    src/inference/tensorrt_engine.cpp
+    src/cpp/tokenizer.cpp
+    src/cpp/memory_manager.cpp
+    src/cpp/memory_pool.cpp
+    src/cpp/cuda_graphs.cpp
+    src/cpp/kv_cache.cpp
+    src/cpp/kv_cache_kernels.cu
+)
+
 # Create engine diagnostic tool
 add_executable(engine_diagnostic
     src/cpp/engine_diagnostic.cpp
 )
 
 target_link_libraries(complete_inference
+    CUDA::cudart
+    CUDA::cublas
+    CUDA::curand
+    ${TensorRT_nvinfer_LIBRARY}
+    ${TensorRT_nvonnxparser_LIBRARY}
+    ${TensorRT_nvinfer_plugin_LIBRARY}
+)
+
+target_link_libraries(streaming_inference_example
+    CUDA::cudart
+    CUDA::cublas
+    CUDA::curand
+    ${TensorRT_nvinfer_LIBRARY}
+    ${TensorRT_nvonnxparser_LIBRARY}
+    ${TensorRT_nvinfer_plugin_LIBRARY}
+)
+
+target_link_libraries(speculative_decoding_example
     CUDA::cudart
     CUDA::cublas
     CUDA::curand

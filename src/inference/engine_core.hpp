@@ -81,6 +81,11 @@ struct EngineConfig {
     int gpu_device_id = 0;
 };
 
+// Streaming callback function type
+// Called for each generated token during streaming inference
+// Parameters: token_id, token_text, is_final
+using StreamCallback = std::function<void(int32_t, const std::string&, bool)>;
+
 struct InferenceRequest {
     std::string prompt;
     int max_tokens = 256;
@@ -89,6 +94,9 @@ struct InferenceRequest {
     std::vector<std::string> stop_sequences;
     bool stream = false;
     std::string request_id;
+
+    // Optional callback for streaming responses
+    StreamCallback stream_callback = nullptr;
 };
 
 struct InferenceResult {
